@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مولد RSS لتويتر/X عبر Cloudflare</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            scroll-behavior: smooth;
+        }
+        .feed-item {
+            border-right: 3px solid #2dd4bf; /* teal-400 */
+            transition: all 0.3s ease;
+        }
+        .feed-item:hover {
+            transform: translateY(-2px);
+            background-color: #1f2937; /* gray-800 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+    <div class="container mx-auto max-w-3xl p-4 md:p-8">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-teal-400">مولّد خلاصة RSS لـ X/Twitter</h1>
+            <p class="text-gray-400 mt-2">تطبيق فائق السرعة والأمان، مبني على منصة <a href="https://pages.cloudflare.com/" target="_blank" class="text-teal-500 hover:underline">Cloudflare</a>.</p>
+        </div>
+
+        <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
+            <label for="usernameInput" class="block text-lg font-semibold mb-3 text-gray-200">أدخل اسم مستخدم X (بدون @)</label>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input type="text" id="usernameInput" placeholder="مثال: Google" class="flex-grow bg-gray-700 text-white border-2 border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:outline-none transition duration-300">
+                <button id="generateBtn" class="bg-teal-500 hover:bg-teal-600 text-gray-900 font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg hover:shadow-teal-500/50 flex items-center justify-center gap-2">
+                    <span>إنشاء وعرض</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="resultSection" class="hidden mt-8">
+            <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
+                <h2 class="text-2xl font-semibold text-teal-300 mb-4">رابط RSS الخاص بك جاهز!</h2>
+                <div class="flex flex-col sm:flex-row items-center gap-3">
+                    <input type="text" id="rssUrl" readonly class="w-full bg-gray-700 text-teal-300 border border-gray-600 rounded-md px-3 py-2 font-mono text-sm">
+                    <button id="copyBtn" class="w-full sm:w-auto bg-gray-200 hover:bg-white text-gray-800 font-bold py-2 px-4 rounded-md transition duration-300 flex items-center justify-center gap-2 flex-shrink-0">
+                        <span id="copyBtnText">نسخ</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="previewSection" class="mt-8">
+                 <h3 class="text-2xl font-semibold text-gray-200 mb-4 border-b-2 border-gray-700 pb-2">معاينة الخلاصة</h3>
+                 <div id="loadingSpinner" class="hidden text-center my-6">
+                    <svg class="animate-spin h-8 w-8 text-teal-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-2 text-gray-400">جاري جلب آخر التغريدات عبر خوادم Cloudflare...</p>
+                </div>
+                <div id="feedContent" class="space-y-4"></div>
+                <div id="errorView" class="hidden text-center my-6 bg-red-900/50 border border-red-500/50 p-4 rounded-lg">
+                    <p id="errorMessage" class="text-red-300"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const usernameInput = document.getElementById('usernameInput');
+            const generateBtn = document.getElementById('generateBtn');
+            const resultSection = document.getElementById('resultSection');
+            const rssUrl = document.getElementById('rssUrl');
+            const copyBtn = document.getElementById('copyBtn');
+            const copyBtnText = document.getElementById('copyBtnText');
+            
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const feedContent = document.getElementById('feedContent');
+            const errorView = document.getElementById('errorView');
+            const errorMessage = document.getElementById('errorMessage');
+
+            // The base URL for our backend function is the current site's origin.
+            const API_BASE_URL = window.location.origin;
+
+            generateBtn.addEventListener('click', () => {
+                const username = usernameInput.value.trim();
+                if (!username) {
+                    alert('الرجاء إدخال اسم مستخدم صالح.');
+                    return;
+                }
+                
+                // The URL points to our own backend function now!
+                const publicRssUrl = `https://rsshub.app/twitter/user/${username}`;
+                rssUrl.value = publicRssUrl; // We show the user the standard RSSHub URL
+
+                resultSection.classList.remove('hidden');
+                feedContent.innerHTML = '';
+                errorView.classList.add('hidden');
+                loadingSpinner.classList.remove('hidden');
+                
+                resultSection.scrollIntoView({ behavior: 'smooth' });
+
+                fetchAndDisplayFeed(username);
+            });
+
+            async function fetchAndDisplayFeed(username) {
+                // Construct the URL to our own backend Cloudflare Function
+                const apiFetchUrl = `${API_BASE_URL}/api/rss?username=${encodeURIComponent(username)}`;
+                
+                try {
+                    // No more CORS proxy needed, we are calling our own backend
+                    const response = await fetch(apiFetchUrl);
+                    const str = await response.text();
+                    
+                    if (!response.ok) {
+                        // If the function returned an error, the XML parser might fail,
+                        // so we check the HTTP status first.
+                         throw new Error(`فشل في جلب البيانات من الخادم. قد يكون اسم المستخدم غير صحيح.`);
+                    }
+                    
+                    const data = new window.DOMParser().parseFromString(str, "text/xml");
+                    const errorNode = data.querySelector("error");
+                    if (errorNode) {
+                        throw new Error(errorNode.textContent || 'حدث خطأ غير معروف في RSSHub.');
+                    }
+
+                    const items = data.querySelectorAll("item");
+                    loadingSpinner.classList.add('hidden');
+
+                    if (items.length === 0) {
+                       throw new Error('لم يتم العثور على تغريدات. تأكد من صحة اسم المستخدم وأن الحساب عام.');
+                    }
+
+                    items.forEach(item => {
+                        const link = item.querySelector("link").textContent;
+                        const description = item.querySelector("description").textContent;
+                        const pubDate = new Date(item.querySelector("pubDate").textContent).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+                        
+                        const feedItem = document.createElement('div');
+                        feedItem.className = 'bg-gray-800/50 p-4 rounded-lg feed-item';
+                        // Sanitize description before inserting to prevent XSS
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = description;
+                        // Replace twitter video thumbnails with links
+                        tempDiv.querySelectorAll('.twitter-video-player').forEach(player => {
+                            const videoLink = player.querySelector('a');
+                            if(videoLink) {
+                                player.innerHTML = `<a href="${videoLink.href}" target="_blank" class="text-teal-400 hover:underline">[رابط فيديو]</a>`;
+                            }
+                        });
+
+
+                        feedItem.innerHTML = `
+                            <div class="prose prose-invert max-w-none text-gray-300">${tempDiv.innerHTML}</div>
+                            <div class="text-xs text-gray-500 mt-3 flex justify-between items-center">
+                                <span>${pubDate}</span>
+                                <a href="${link}" target="_blank" class="text-teal-500 hover:text-teal-400 hover:underline">
+                                    عرض على X &rarr;
+                                </a>
+                            </div>
+                        `;
+                        feedContent.appendChild(feedItem);
+                    });
+
+                } catch (error) {
+                    console.error('Error fetching or parsing feed:', error);
+                    loadingSpinner.classList.add('hidden');
+                    errorMessage.textContent = `${error.message}`;
+                    errorView.classList.remove('hidden');
+                }
+            }
+
+            copyBtn.addEventListener('click', () => {
+                navigator.clipboard.writeText(rssUrl.value).then(() => {
+                    copyBtnText.textContent = 'تم النسخ!';
+                    setTimeout(() => { copyBtnText.textContent = 'نسخ'; }, 2000);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
