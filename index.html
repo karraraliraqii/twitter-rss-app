@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مولد RSS لتويتر/X عبر Cloudflare</title>
+    <title>مولد RSS متعدد المصادر (X, Instagram, SoundCloud)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +21,15 @@
             transform: translateY(-2px);
             background-color: #1f2937; /* gray-800 */
         }
+        .platform-radio:checked + label {
+            background-color: #14b8a6; /* teal-600 */
+            border-color: #0d9488; /* teal-700 */
+            color: white;
+            transform: scale(1.05);
+        }
+        label {
+             transition: all 0.2s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -28,159 +37,184 @@
     <div class="container mx-auto max-w-3xl p-4 md:p-8">
         
         <div class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-teal-400">مولّد خلاصة RSS لـ X/Twitter</h1>
-            <p class="text-gray-400 mt-2">تطبيق فائق السرعة والأمان، مبني على منصة <a href="https://pages.cloudflare.com/" target="_blank" class="text-teal-500 hover:underline">Cloudflare</a>.</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-teal-400">مولّد RSS متعدد المصادر</h1>
+            <p class="text-gray-400 mt-2">يدعم X و Instagram عبر <strong class="text-teal-500">RSSHub</strong> و SoundCloud عبر <strong class="text-pink-500">RSS-Bridge</strong>.</p>
         </div>
 
         <div class="bg-gray-800 p-6 rounded-2xl shadow-2xl border border-gray-700">
-            <label for="usernameInput" class="block text-lg font-semibold mb-3 text-gray-200">أدخل اسم مستخدم X (بدون @)</label>
-            <div class="flex flex-col sm:flex-row gap-4">
-                <input type="text" id="usernameInput" placeholder="مثال: Google" class="flex-grow bg-gray-700 text-white border-2 border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:outline-none transition duration-300">
-                <button id="generateBtn" class="bg-teal-500 hover:bg-teal-600 text-gray-900 font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg hover:shadow-teal-500/50 flex items-center justify-center gap-2">
-                    <span>إنشاء وعرض</span>
-                </button>
+            <!-- Platform Selector -->
+            <div class="mb-5">
+                <label class="block text-lg font-semibold mb-3 text-gray-200">1. اختر المنصة</label>
+                <div class="grid grid-cols-3 gap-3">
+                    <input type="radio" id="platform-x" name="platform" value="x" class="hidden platform-radio" checked>
+                    <label for="platform-x" class="text-center py-3 px-2 rounded-lg border-2 border-gray-600 cursor-pointer">X / Twitter</label>
+                    
+                    <input type="radio" id="platform-instagram" name="platform" value="instagram" class="hidden platform-radio">
+                    <label for="platform-instagram" class="text-center py-3 px-2 rounded-lg border-2 border-gray-600 cursor-pointer">Instagram</label>
+
+                    <input type="radio" id="platform-soundcloud" name="platform" value="soundcloud" class="hidden platform-radio">
+                    <label for="platform-soundcloud" class="text-center py-3 px-2 rounded-lg border-2 border-gray-600 cursor-pointer">SoundCloud</label>
+                </div>
+            </div>
+
+            <!-- Username Input -->
+            <div>
+                 <label for="usernameInput" id="usernameLabel" class="block text-lg font-semibold mb-3 text-gray-200">2. أدخل اسم مستخدم X (بدون @)</label>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <input type="text" id="usernameInput" placeholder="مثال: elonmusk" class="flex-grow bg-gray-700 text-white border-2 border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:outline-none transition duration-300">
+                    <button id="generateBtn" class="bg-teal-500 hover:bg-teal-600 text-gray-900 font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg hover:shadow-teal-500/50 flex items-center justify-center gap-2">
+                        <span>إنشاء وعرض</span>
+                    </button>
+                </div>
             </div>
         </div>
 
         <div id="resultSection" class="hidden mt-8">
-            <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
-                <h2 class="text-2xl font-semibold text-teal-300 mb-4">رابط RSS الخاص بك جاهز!</h2>
-                <div class="flex flex-col sm:flex-row items-center gap-3">
-                    <input type="text" id="rssUrl" readonly class="w-full bg-gray-700 text-teal-300 border border-gray-600 rounded-md px-3 py-2 font-mono text-sm">
-                    <button id="copyBtn" class="w-full sm:w-auto bg-gray-200 hover:bg-white text-gray-800 font-bold py-2 px-4 rounded-md transition duration-300 flex items-center justify-center gap-2 flex-shrink-0">
-                        <span id="copyBtnText">نسخ</span>
-                    </button>
-                </div>
-            </div>
-
-            <div id="previewSection" class="mt-8">
-                 <h3 class="text-2xl font-semibold text-gray-200 mb-4 border-b-2 border-gray-700 pb-2">معاينة الخلاصة</h3>
-                 <div id="loadingSpinner" class="hidden text-center my-6">
-                    <svg class="animate-spin h-8 w-8 text-teal-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p class="mt-2 text-gray-400">جاري جلب آخر التغريدات عبر خوادم Cloudflare...</p>
-                </div>
-                <div id="feedContent" class="space-y-4"></div>
-                <div id="errorView" class="hidden text-center my-6 bg-red-900/50 border border-red-500/50 p-4 rounded-lg">
-                    <p id="errorMessage" class="text-red-300"></p>
-                </div>
-            </div>
+            <!-- Results will be injected here by JavaScript -->
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const usernameInput = document.getElementById('usernameInput');
             const generateBtn = document.getElementById('generateBtn');
             const resultSection = document.getElementById('resultSection');
-            const rssUrl = document.getElementById('rssUrl');
-            const copyBtn = document.getElementById('copyBtn');
-            const copyBtnText = document.getElementById('copyBtnText');
+            const usernameInput = document.getElementById('usernameInput');
+            const usernameLabel = document.getElementById('usernameLabel');
             
-            const loadingSpinner = document.getElementById('loadingSpinner');
-            const feedContent = document.getElementById('feedContent');
-            const errorView = document.getElementById('errorView');
-            const errorMessage = document.getElementById('errorMessage');
-
-            // The base URL for our backend function is the current site's origin.
             const API_BASE_URL = window.location.origin;
+
+            const platformConfig = {
+                'x': { label: '2. أدخل اسم مستخدم X (بدون @)', placeholder: 'مثال: elonmusk' },
+                'instagram': { label: '2. أدخل اسم مستخدم Instagram', placeholder: 'مثال: nasa' },
+                'soundcloud': { label: '2. أدخل اسم مستخدم SoundCloud', placeholder: 'مثال: discover' }
+            };
+
+            document.querySelectorAll('input[name="platform"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const platform = e.target.value;
+                    usernameLabel.textContent = platformConfig[platform].label;
+                    usernameInput.placeholder = platformConfig[platform].placeholder;
+                });
+            });
 
             generateBtn.addEventListener('click', () => {
                 const username = usernameInput.value.trim();
+                const platform = document.querySelector('input[name="platform"]:checked').value;
+
                 if (!username) {
                     alert('الرجاء إدخال اسم مستخدم صالح.');
                     return;
                 }
                 
-                // The URL points to our own backend function now!
-                const publicRssUrl = `https://rsshub.app/twitter/user/${username}`;
-                rssUrl.value = publicRssUrl; // We show the user the standard RSSHub URL
-
                 resultSection.classList.remove('hidden');
-                feedContent.innerHTML = '';
-                errorView.classList.add('hidden');
-                loadingSpinner.classList.remove('hidden');
-                
                 resultSection.scrollIntoView({ behavior: 'smooth' });
-
-                fetchAndDisplayFeed(username);
+                showLoader();
+                fetchAndDisplayFeed(username, platform);
             });
+            
+            function showLoader() {
+                resultSection.innerHTML = `
+                    <div id="loadingSpinner" class="text-center my-6">
+                        <svg class="animate-spin h-8 w-8 text-teal-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <p class="mt-2 text-gray-400">جاري جلب البيانات عبر خوادم Cloudflare...</p>
+                    </div>`;
+            }
 
-            async function fetchAndDisplayFeed(username) {
-                // Construct the URL to our own backend Cloudflare Function
-                const apiFetchUrl = `${API_BASE_URL}/api/rss?username=${encodeURIComponent(username)}`;
+            async function fetchAndDisplayFeed(username, platform) {
+                const apiFetchUrl = `${API_BASE_URL}/api/rss?platform=${platform}&username=${encodeURIComponent(username)}`;
                 
                 try {
-                    // No more CORS proxy needed, we are calling our own backend
                     const response = await fetch(apiFetchUrl);
                     const str = await response.text();
                     
-                    if (!response.ok) {
-                        // If the function returned an error, the XML parser might fail,
-                        // so we check the HTTP status first.
-                         throw new Error(`فشل في جلب البيانات من الخادم. قد يكون اسم المستخدم غير صحيح.`);
-                    }
+                    if (!response.ok) throw new Error(`فشل الخادم في جلب البيانات. تأكد من صحة اسم المستخدم أو أن الخدمة تعمل.`);
                     
                     const data = new window.DOMParser().parseFromString(str, "text/xml");
-                    const errorNode = data.querySelector("error");
-                    if (errorNode) {
-                        throw new Error(errorNode.textContent || 'حدث خطأ غير معروف في RSSHub.');
-                    }
+                    const errorNode = data.querySelector("error"); // For RSS-Bridge errors
+                    if (errorNode) throw new Error(`خطأ من المصدر: ${errorNode.getAttribute('message')}`);
+                    
+                    const items = data.querySelectorAll("item, entry"); // 'entry' for Atom feeds from RSS-Bridge
+                    if (items.length === 0) throw new Error('لم يتم العثور على منشورات. تأكد من صحة اسم المستخدم وأن الحساب عام.');
 
-                    const items = data.querySelectorAll("item");
-                    loadingSpinner.classList.add('hidden');
+                    renderResults(items, username, platform, response.headers.get('X-RSS-Service'));
 
-                    if (items.length === 0) {
-                       throw new Error('لم يتم العثور على تغريدات. تأكد من صحة اسم المستخدم وأن الحساب عام.');
-                    }
+                } catch (error) {
+                    renderError(error.message);
+                }
+            }
+            
+            function renderResults(items, username, platform, service) {
+                let publicRssUrl = '';
+                let serviceUsedText = service === 'RSS-Bridge' 
+                    ? `تم الجلب باستخدام <strong class="text-pink-500">${service}</strong>`
+                    : `تم الجلب باستخدام <strong class="text-teal-500">${service}</strong>`;
 
-                    items.forEach(item => {
-                        const link = item.querySelector("link").textContent;
-                        const description = item.querySelector("description").textContent;
-                        const pubDate = new Date(item.querySelector("pubDate").textContent).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
-                        
-                        const feedItem = document.createElement('div');
-                        feedItem.className = 'bg-gray-800/50 p-4 rounded-lg feed-item';
-                        // Sanitize description before inserting to prevent XSS
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = description;
-                        // Replace twitter video thumbnails with links
-                        tempDiv.querySelectorAll('.twitter-video-player').forEach(player => {
-                            const videoLink = player.querySelector('a');
-                            if(videoLink) {
-                                player.innerHTML = `<a href="${videoLink.href}" target="_blank" class="text-teal-400 hover:underline">[رابط فيديو]</a>`;
-                            }
-                        });
+                // Logic to construct the display URL
+                switch (platform) {
+                    case 'x':
+                        publicRssUrl = `https://rsshub.app/twitter/user/${username}`;
+                        break;
+                    case 'instagram':
+                        publicRssUrl = `https://rsshub.app/picnob/user/${username}`;
+                        break;
+                    case 'soundcloud':
+                        publicRssUrl = `https://bridge.rss-proxy.org/?action=display&bridge=SoundCloud&context=By+user&u=${username}&format=Atom`;
+                        break;
+                }
 
+                let feedItemsHtml = '';
+                items.forEach(item => {
+                    const title = item.querySelector("title").textContent;
+                    const link = item.querySelector("link").getAttribute('href') || item.querySelector("link").textContent;
+                    const description = item.querySelector("description, content").textContent; // 'content' for Atom
+                    const pubDate = new Date(item.querySelector("published, pubDate").textContent).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+                    
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = description;
+                    tempDiv.querySelectorAll('img').forEach(img => { img.classList.add('rounded-lg', 'mx-auto', 'my-2', 'max-w-full', 'h-auto') });
 
-                        feedItem.innerHTML = `
+                    feedItemsHtml += `
+                        <div class="bg-gray-800/50 p-4 rounded-lg feed-item">
+                             <h4 class="font-bold text-teal-400 mb-2">${title}</h4>
                             <div class="prose prose-invert max-w-none text-gray-300">${tempDiv.innerHTML}</div>
                             <div class="text-xs text-gray-500 mt-3 flex justify-between items-center">
                                 <span>${pubDate}</span>
-                                <a href="${link}" target="_blank" class="text-teal-500 hover:text-teal-400 hover:underline">
-                                    عرض على X &rarr;
-                                </a>
+                                <a href="${link}" target="_blank" class="text-teal-500 hover:text-teal-400 hover:underline">عرض المصدر &rarr;</a>
                             </div>
-                        `;
-                        feedContent.appendChild(feedItem);
-                    });
-
-                } catch (error) {
-                    console.error('Error fetching or parsing feed:', error);
-                    loadingSpinner.classList.add('hidden');
-                    errorMessage.textContent = `${error.message}`;
-                    errorView.classList.remove('hidden');
-                }
-            }
-
-            copyBtn.addEventListener('click', () => {
-                navigator.clipboard.writeText(rssUrl.value).then(() => {
-                    copyBtnText.textContent = 'تم النسخ!';
-                    setTimeout(() => { copyBtnText.textContent = 'نسخ'; }, 2000);
+                        </div>`;
                 });
-            });
+
+                resultSection.innerHTML = `
+                    <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
+                        <div class="flex justify-between items-center mb-4">
+                             <h2 class="text-2xl font-semibold text-teal-300">رابط RSS الخاص بك جاهز!</h2>
+                             <span class="text-xs text-gray-400">${serviceUsedText}</span>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-center gap-3">
+                            <input type="text" id="rssUrlOutput" value="${publicRssUrl}" readonly class="w-full bg-gray-700 text-teal-300 border border-gray-600 rounded-md px-3 py-2 font-mono text-sm">
+                            <button id="copyBtn" class="w-full sm:w-auto bg-gray-200 hover:bg-white text-gray-800 font-bold py-2 px-4 rounded-md transition duration-300 flex items-center justify-center gap-2 flex-shrink-0">
+                                <span id="copyBtnText">نسخ</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-8">
+                        <h3 class="text-2xl font-semibold text-gray-200 mb-4 border-b-2 border-gray-700 pb-2">معاينة الخلاصة</h3>
+                        <div class="space-y-4">${feedItemsHtml}</div>
+                    </div>`;
+
+                document.getElementById('copyBtn').addEventListener('click', (e) => {
+                    const urlOutput = document.getElementById('rssUrlOutput');
+                    const btnText = e.currentTarget.querySelector('span');
+                    navigator.clipboard.writeText(urlOutput.value).then(() => {
+                        btnText.textContent = 'تم النسخ!';
+                        setTimeout(() => { btnText.textContent = 'نسخ'; }, 2000);
+                    });
+                });
+            }
+            
+            function renderError(message) {
+                 resultSection.innerHTML = `<div class="text-center my-6 bg-red-900/50 border border-red-500/50 p-4 rounded-lg"><p class="text-red-300">${message}</p></div>`;
+            }
         });
     </script>
 </body>
