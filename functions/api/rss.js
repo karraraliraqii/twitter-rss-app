@@ -2,51 +2,74 @@
  * Backend Cloudflare Function
  * Handles requests to /api/rss
  *
- * This function acts as a secure proxy to RSSHub.
+ * This function acts as an intelligent proxy, choosing the best service
+ * (RSSHub or RSS-Bridge) for the requested platform.
  */
 export async function onRequest(context) {
-  // Get the ?username=... query parameter from the request URL.
+  // Get query parameters from the request URL.
   const { searchParams } = new URL(context.request.url);
+  const platform = searchParams.get('platform');
   const username = searchParams.get('username');
 
-  // Return an error if the username is missing.
-  if (!username) {
-    return new Response('Missing username query parameter', { status: 400 });
+  // Return an error if parameters are missing.
+  if (!platform || !username) {
+    return new Response('Missing platform or username query parameter', { status: 400 });
   }
 
-  // The target RSSHub instance. You can change this to your self-hosted instance.
-  const RSSHUB_URL = `https://rsshub.app/twitter/user/${username}`;
+  let fetchUrl = '';
+  let serviceName = ''; // To identify which service we are using
 
-  // It's good practice to set a custom User-Agent.
-  const headers = {
-    'User-Agent': 'Cloudflare-RSS-Generator/1.0 (by @alkaid.karrar)'
+  // --- Intelligent Routing Logic ---
+  // Decide which service to use based on the platform.
+  switch (platform) {
+    case 'x':
+      serviceName = 'RSSHub';
+      fetchUrl = `https://rsshub.app/twitter/user/${username}`;
+      break;
+
+    case 'instagram':
+      // For Instagram, RSSHub's Picnob route is the most reliable.
+      serviceName = 'RSSHub';
+      fetchUrl = `https://rsshub.app/picnob/user/${username}`;
+      break;
+
+    case 'soundcloud':
+      // For SoundCloud, RSS-Bridge is an excellent choice.
+      serviceName = 'RSS-Bridge';
+      // Note: RSS-Bridge often returns Atom format, which is fine.
+      fetchUrl = `https://bridge.rss-proxy.org/?action=display&bridge=SoundCloud&context=By+user&u=${encodeURIComponent(username)}&format=Atom`;
+      break;
+
+    default:
+      return new Response(`Unsupported platform: ${platform}`, { status: 400 });
+  }
+
+  const requestHeaders = {
+    'User-Agent': `Cloudflare-RSS-Generator/3.0 (Service: ${serviceName}, Platform: ${platform})`
   };
 
   try {
-    // Fetch the feed from RSSHub using Cloudflare's robust fetch API.
-    const response = await fetch(RSSHUB_URL, { headers });
+    // Fetch the feed from the chosen service.
+    const response = await fetch(fetchUrl, { headers: requestHeaders });
 
-    // Create a new response based on the RSSHub response.
-    // This copies the status, statusText, and body.
+    // Create a new response, adding a custom header to identify the service used.
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.set('Content-Type', 'application/rss+xml; charset=utf-8');
+    responseHeaders.set('Cache-Control', 'public, max-age=900'); // Cache for 15 minutes
+    responseHeaders.set('X-RSS-Service', serviceName); // Custom header for the frontend
+
     const newResponse = new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: {
-         // Set the correct content type for an RSS feed.
-        'Content-Type': 'application/rss+xml; charset=utf-8',
-        // Instruct Cloudflare's CDN to cache the response for 10 minutes.
-        // This reduces load on RSSHub and speeds up repeated requests.
-        'Cache-Control': 'public, max-age=600',
-      }
+      headers: responseHeaders
     });
 
     return newResponse;
 
   } catch (error) {
-    // Return a generic server error if the fetch fails completely.
-    return new Response('Failed to fetch RSS feed from the source.', { 
-        status: 500,
-        headers: { 'Content-Type': 'text/plain' }
+    return new Response('Failed to fetch RSS feed from the source.', {
+      status: 502, // Bad Gateway
+      headers: { 'Content-Type': 'text/plain' }
     });
   }
 }
